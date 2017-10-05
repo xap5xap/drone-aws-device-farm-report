@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -45,14 +46,25 @@ func (p *Plugin) Exec() error {
 	if err != nil {
 		return err
 	}
-	//Get the run to see the status
-	run, err := getRun(p.RunName, project, svc)
-	if err != nil {
-		return err
-	}
-	fmt.Println("run", run)
 
-	fmt.Println("End")
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		//Get the run to see the status
+		run, err := getRun(p.RunName, project, svc)
+		if err != nil {
+			return err
+		}
+		fmt.Println("run", run)
+
+		if *run.Status == "COMPLETED" && (*run.Result == "ERRORED" || *run.Result == "FAILED") {
+			return fmt.Errorf("The test run has failed")
+		}
+		if *run.Status == "COMPLETED" && *run.Result == "PASSED" {
+			break
+		}
+	}
 
 	return nil
 }
